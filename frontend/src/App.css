@@ -1,0 +1,109 @@
+:root {
+  --bg: #0f1115;
+  --panel: #151826;
+  --muted: #9aa4b2;
+  --text: #e9eef5;
+  --accent: #6ea8fe;
+  --accent-2: #22d3ee;
+  --border: #242a3b;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+}
+
+.app-header, .app-footer {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(21, 24, 38, 0.8);
+  backdrop-filter: blur(6px);
+}
+.app-footer { border-top: 1px solid var(--border); border-bottom: none; }
+
+.app-main {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+.sidebar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  height: calc(100vh - 130px);
+  overflow: auto;
+}
+
+.viewer {
+  background: #0e1320;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0;
+  height: calc(100vh - 130px);
+  overflow: auto;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input, .textarea {
+  background: #0f1424;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+}
+.textarea { resize: vertical; }
+
+.row { display: flex; gap: 8px; }
+
+.button {
+  appearance: none;
+  background: #10172a;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.button.primary { background: linear-gradient(90deg, var(--accent), var(--accent-2)); border: none; color: #0b1020; font-weight: 600; }
+.button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.error { color: #ff8b8b; font-size: 12px; }
+
+.placeholder { color: var(--muted); padding: 16px; }
+
+.doc {
+  padding: 24px;
+}
+.doc h1, .doc h2, .doc h3 { margin-top: 1.2em; }
+.doc table { border-collapse: collapse; width: 100%; }
+.doc table, .doc th, .doc td { border: 1px solid #26324b; }
+.doc th, .doc td { padding: 8px; }
+.doc a { color: var(--accent-2); }
+.doc ol { padding-left: 24px; }
+.doc ul { padding-left: 24px; }

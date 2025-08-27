@@ -1,4 +1,5 @@
 import os
+import time
 from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -70,6 +71,27 @@ def _build_user_prompt(data: GenerateRequest) -> str:
     return "\n".join(parts)
 
 
+def _create_stream_with_retries(client: "OpenAI", *, messages, temperature: float, max_tokens: int):
+    max_attempts = 3
+    base_delay = 0.5
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+        except Exception as exc:  # pragma: no cover
+            last_exc = exc
+            if attempt == max_attempts:
+                break
+            time.sleep(base_delay * (2 ** (attempt - 1)))
+    raise last_exc  # type: ignore[misc]
+
+
 @app.post("/api/generate")
 async def generate_contract(data: GenerateRequest):
     if OpenAI is None:
@@ -89,16 +111,26 @@ async def generate_contract(data: GenerateRequest):
     system_message = {"role": "system", "content": SYSTEM_PROMPT}
     user_message = {"role": "user", "content": _build_user_prompt(data)}
 
+    # Limit output tokens conservatively to reduce context-length errors
+    max_tokens_env = os.getenv("OPENAI_MAX_TOKENS")
     try:
-        # Stream chat completions as HTML chunks
-        stream = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        max_tokens = int(max_tokens_env) if max_tokens_env else 4000
+    except ValueError:
+        max_tokens = 4000
+
+    try:
+        stream = _create_stream_with_retries(
+            client,
             messages=[system_message, user_message],
             temperature=0.2,
-            stream=True,
+            max_tokens=max_tokens,
         )
     except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=f"Downstream model error: {exc}")
+        message = str(exc)
+        status = 502
+        if "maximum context length" in message or "max_tokens" in message:
+            status = 413  # payload too large / context too long
+        raise HTTPException(status_code=status, detail=f"Downstream model error: {message}")
 
     async def _event_stream() -> AsyncGenerator[bytes, None]:
         # Yield minimal HTML prelude so browsers render progressively if users open endpoint directly

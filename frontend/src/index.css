@@ -1,0 +1,3 @@
+/* Minimal reset to allow App.css to control layout/theme */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }

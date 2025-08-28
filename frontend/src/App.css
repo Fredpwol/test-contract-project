@@ -40,6 +40,56 @@ body {
   padding: 12px;
 }
 
+/* Chat layout */
+.chat-main { display: grid; grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+.chat-main.two-col { grid-template-columns: 1fr 1fr; }
+.chat-main.three-col { grid-template-columns: 260px 1fr 1fr; }
+
+.chat-panel { display: grid; grid-template-rows: 1fr auto; height: calc(100vh - 130px); }
+
+.chat-messages { background: #0e1320; border: 1px solid var(--border); border-radius: 10px; padding: 12px 0; overflow: auto; }
+
+.message {
+  padding: 10px 16px;
+}
+.message.user {
+  display: flex;
+  justify-content: flex-end;
+}
+.message.user .bubble {
+  background: #10172a;
+  border: 1px solid var(--border);
+  max-width: 75ch;
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+.assistant-placeholder {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.message.assistant .doc {
+  background: #0f1424;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.chat-input { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px; }
+
+/* Right preview uses existing .viewer and .doc styles */
+.viewer { background: #0e1320; border: 1px solid var(--border); border-radius: 10px; padding: 0; height: calc(100vh - 130px); overflow: auto; }
+
+/* Sessions sidebar */
+.sessions { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; height: calc(100vh - 130px); display: grid; grid-template-rows: auto 1fr; }
+.sessions-header { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border); }
+.sessions-header .title { font-weight: 600; }
+.sessions-list { overflow: auto; }
+.session-item { padding: 10px; border-bottom: 1px solid #1c2335; cursor: pointer; }
+.session-item:hover { background: #0f1424; }
+.session-item.active { background: #0f1424; border-left: 3px solid var(--accent); }
+.session-title { font-size: 14px; }
+.session-sub { font-size: 11px; color: var(--muted); }
+
 .sidebar {
   background: var(--panel);
   border: 1px solid var(--border);

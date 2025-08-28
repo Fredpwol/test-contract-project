@@ -11,6 +11,7 @@ __pycache__/
 # Env
 .env
 .env.*
+venv/
 
 # OS/editor
 .DS_Store

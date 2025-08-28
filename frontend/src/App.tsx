@@ -6,6 +6,8 @@ type ChatMsg = { id: string; role: 'user' | 'assistant'; content: string }
 type SessionItem = { session_id: string; created_at?: string; document_title?: string; document_html?: string }
 
 function App() {
+  const API_BASE = (import.meta as any)?.env?.VITE_API_BASE_URL?.replace(/\/$/, '') || ''
+  const api = useCallback((path: string) => `${API_BASE}${path}` as string, [API_BASE])
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('Draft terms of service for a cloud cyber SaaS company based in New York')
   const [isSending, setIsSending] = useState(false)
@@ -25,7 +27,7 @@ function App() {
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true)
     try {
-      const resp = await fetch('/api/session/list')
+      const resp = await fetch(api('/api/session/list'))
       if (!resp.ok) return
       const data = await resp.json()
       const items: SessionItem[] = Array.isArray(data?.sessions) ? data.sessions : []
@@ -33,7 +35,7 @@ function App() {
     } finally {
       setIsLoadingSessions(false)
     }
-  }, [])
+  }, [api])
 
   useEffect(() => {
     loadSessions().catch(() => {})
@@ -41,7 +43,7 @@ function App() {
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
-    const resp = await fetch('/api/session/start', {
+    const resp = await fetch(api('/api/session/start'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -56,7 +58,7 @@ function App() {
     setSessionId(sid)
     loadSessions().catch(() => {})
     return sid
-  }, [sessionId, loadSessions])
+  }, [sessionId, loadSessions, api])
 
   const lastAssistantHtml = useCallback(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -119,12 +121,12 @@ function App() {
       if (!sid) throw new Error('No session available')
       const base = lastAssistantHtml()
       if (base) {
-        await fetch(`/api/session/${sid}/document`, {
+        await fetch(api(`/api/session/${sid}/document`), {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: base }),
         })
       }
 
-      const resp = await fetch('/api/chat', {
+      const resp = await fetch(api('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sid, message: { role: 'user', content: text } }),
@@ -185,6 +187,20 @@ function App() {
     const a = document.createElement('a')
     a.href = url
     a.download = 'terms-of-service.md'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, [])
+
+  const downloadAsHtml = useCallback((md: string) => {
+    const htmlBody = (marked.parse(md) as string) || ''
+    const full = `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Terms of Service</title><style>body{font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#0b1020; line-height:1.5; padding:24px;} a{color:#0ea5e9;} table{border-collapse:collapse;width:100%;} table,th,td{border:1px solid #cbd5e1;} th,td{padding:8px;} h1,h2,h3{margin-top:1.2em;}</style></head><body>${htmlBody}</body></html>`
+    const blob = new Blob([full], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'terms-of-service.html'
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -266,6 +282,7 @@ function App() {
               <div className="row" style={{ padding: '10px' }}>
                 <button className="button" onClick={() => copyHtml(latestMd)}>Copy .md</button>
                 <button className="button" onClick={() => downloadHtml(latestMd)}>Download .md</button>
+                <button className="button" onClick={() => downloadAsHtml(latestMd)}>Download .html</button>
               </div>
               <div className="doc" dangerouslySetInnerHTML={{ __html: latestRendered }} />
             </>

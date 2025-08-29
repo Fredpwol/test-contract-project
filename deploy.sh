@@ -36,7 +36,7 @@ PLATFORM="linux/amd64"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 BACKEND_CONTEXT="$SCRIPT_DIR/backend"
 FRONTEND_CONTEXT="$SCRIPT_DIR/frontend"
-BACKEND_DOCKERFILE="$BACKEND_CONTEXT/deploy.Dockerfile"
+BACKEND_DOCKERFILE="$BACKEND_CONTEXT/Dockerfile"
 
 # Parse args
 while [[ $# -gt 0 ]]; do

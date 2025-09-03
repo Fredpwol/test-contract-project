@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import  { useEffect, useRef } from 'react'
 
 export function extractTitleFromMarkdown(md: string): string | null {
   const m = md.match(/^#\s+(.+)$/m)

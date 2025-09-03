@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import  { useEffect, useRef } from 'react'
 
 export type ChatMsg = { id: string; role: 'user' | 'assistant'; content: string }
 

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import './App.css'
-
-type ChatMsg = { id: string; role: 'user' | 'assistant'; content: string }
-type SessionItem = { session_id: string; created_at?: string; document_title?: string; document_html?: string }
+import { SessionsList, type SessionItem } from './components/SessionsList'
+import { ChatMessages, type ChatMsg } from './components/ChatMessages'
+import { ChatInput } from './components/ChatInput'
+import { Viewer, extractTitleFromMarkdown } from './components/Viewer'
 
 function App() {
   const API_BASE = (import.meta as any)?.env?.VITE_API_BASE_URL?.replace(/\/$/, '') || ''
@@ -16,12 +17,14 @@ function App() {
   const [sessions, setSessions] = useState<SessionItem[]>([])
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
-  const listRef = useRef<HTMLDivElement | null>(null)
-  const previewRef = useRef<HTMLElement | null>(null)
+  // kept for backward compatibility; Viewer now manages its own scrolling
+  // const previewRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (!listRef.current) return
-    listRef.current.scrollTop = listRef.current.scrollHeight
+    // keep document title in sync with latest doc
+    const latest = lastAssistantHtml()
+    const title = extractTitleFromMarkdown(latest) || 'AI Contract Generator'
+    if (document.title !== title) document.title = title
   }, [messages])
 
   const loadSessions = useCallback(async () => {
@@ -41,8 +44,8 @@ function App() {
     loadSessions().catch(() => {})
   }, [loadSessions])
 
-  const ensureSession = useCallback(async (): Promise<string> => {
-    if (sessionId) return sessionId
+  const ensureSession = useCallback(async (forceNew: boolean = false): Promise<string> => {
+    if (!forceNew && sessionId) return sessionId
     const resp = await fetch(api('/api/session/start'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,13 +90,31 @@ function App() {
     setSessionId(null)
     setMessages([])
     try {
-      const sid = await ensureSession()
+      const sid = await ensureSession(true)
       setSessionId(sid)
     } catch {}
   }, [ensureSession])
 
-  const onSelectSession = useCallback((sid: string) => {
+  const onSelectSession = useCallback(async (sid: string) => {
     setSessionId(sid)
+    try {
+      const resp = await fetch(api(`/api/session/${sid}/history`))
+      if (resp.ok) {
+        const data: any = await resp.json().catch(() => ({}))
+        const normalizeRole = (r: string): 'user' | 'assistant' => (r === 'human' || r === 'user') ? 'user' : 'assistant'
+        const msgs = Array.isArray(data?.messages) ? data.messages : []
+        const mapped = msgs.map((m: any) => ({ id: crypto.randomUUID(), role: normalizeRole(m?.role || ''), content: String(m?.content || '') }))
+        if (mapped.length > 0) {
+          setMessages(mapped)
+          return
+        }
+        const md = data?.meta?.document_html || sessions.find(s => s.session_id === sid)?.document_html || ''
+        if (md) {
+          setMessages([{ id: crypto.randomUUID(), role: 'assistant', content: md }])
+          return
+        }
+      }
+    } catch {}
     const item = sessions.find(s => s.session_id === sid)
     const md = item?.document_html || ''
     if (md) {
@@ -101,7 +122,7 @@ function App() {
     } else {
       setMessages([])
     }
-  }, [sessions])
+  }, [sessions, api])
 
   const onSend = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -210,86 +231,48 @@ function App() {
   const latestMd = lastAssistantHtml()
   const latestRendered = latestMd ? marked.parse(latestMd) as string : ''
 
-  useEffect(() => {
-    if (!previewRef.current) return
-    previewRef.current.scrollTop = previewRef.current.scrollHeight
-  }, [latestRendered])
-
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>AI Contract Generator</h1>
       </header>
       <main className="chat-main three-col">
-        <aside className="sessions">
-          <div className="sessions-header">
-            <div className="title">Sessions</div>
-            <div className="row">
-              <button className="button" onClick={() => loadSessions()} disabled={isLoadingSessions}>Refresh</button>
-              <button className="button primary" onClick={onNewSession}>New</button>
-            </div>
-          </div>
-          <div className="sessions-list">
-            {sessions.length === 0 && <div className="placeholder">No sessions yet.</div>}
-            {sessions.map((s) => (
-              <div
-                key={s.session_id}
-                className={`session-item${sessionId === s.session_id ? ' active' : ''}`}
-                onClick={() => onSelectSession(s.session_id)}
-              >
-                <div className="session-title">{s.document_title || 'Untitled'}</div>
-                <div className="session-sub">{(s.created_at || '').replace('T', ' ').replace('Z','')}</div>
-              </div>
-            ))}
-          </div>
-        </aside>
+        <SessionsList
+          sessions={sessions}
+          activeSessionId={sessionId}
+          isLoading={isLoadingSessions}
+          onRefresh={() => loadSessions()}
+          onNew={onNewSession}
+          onSelect={onSelectSession}
+          onRename={async (sid, title) => {
+            try {
+              await fetch(api(`/api/session/${sid}/title`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+              })
+              await loadSessions()
+            } catch {}
+          }}
+        />
         <div className="chat-panel">
-          <div className="chat-messages" ref={listRef}>
-            {messages.length === 0 && (
-              <div className="placeholder">Ask for Terms of Service. For example: “Draft ToS for a New York cloud cybersecurity SaaS.”</div>
-            )}
-            {messages.map((m) => (
-              <div key={m.id} className={`message ${m.role}`}>
-                {m.role === 'assistant' ? (
-                  <div className="assistant-placeholder">Document updated — see preview →</div>
-                ) : (
-                  <div className="bubble">{m.content}</div>
-                )}
-              </div>
-            ))}
-          </div>
-          <form className="chat-input" onSubmit={onSend}>
-            <textarea
-              className="textarea"
-              rows={2}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="What do you want to generate or change?"
-              disabled={isSending}
-            />
-            <div className="row">
-              <button type="submit" className="button primary" disabled={isSending || !input.trim()}>
-                {isSending ? 'Sending…' : 'Send'}
-              </button>
-              <button type="button" className="button" disabled={!abortRef.current} onClick={onAbort}>Abort</button>
-            </div>
-            {error && <div className="error">{error}</div>}
-          </form>
+          <ChatMessages messages={messages} />
+          <ChatInput
+            input={input}
+            isSending={isSending}
+            error={error}
+            onChange={setInput}
+            onSend={onSend}
+            onAbort={onAbort}
+            canAbort={!!abortRef.current}
+          />
         </div>
-        <section className="viewer" ref={previewRef}>
-          {latestMd ? (
-            <>
-              <div className="row" style={{ padding: '10px' }}>
-                <button className="button" onClick={() => copyHtml(latestMd)}>Copy .md</button>
-                <button className="button" onClick={() => downloadHtml(latestMd)}>Download .md</button>
-                <button className="button" onClick={() => downloadAsHtml(latestMd)}>Download .html</button>
-              </div>
-              <div className="doc" dangerouslySetInnerHTML={{ __html: latestRendered }} />
-            </>
-          ) : (
-            <div className="placeholder">Document preview will appear here.</div>
-          )}
-        </section>
+        <Viewer
+          markdown={latestMd}
+          renderedHtml={latestRendered}
+          onCopy={copyHtml}
+          onDownloadMd={downloadHtml}
+          onDownloadHtml={downloadAsHtml}
+          documentTitle={sessions.find(s => s.session_id === sessionId)?.document_title}
+        />
       </main>
       <footer className="app-footer">
         <span>For demonstration only. Not legal advice.</span>
